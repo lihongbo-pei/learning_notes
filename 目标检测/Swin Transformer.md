@@ -55,7 +55,7 @@ patch merging：
 整个模型采取层次化的设计，一共包含4个 stage，并且每个 stage 都会**缩小输入特征图的分辨率**，像 CNN 那样逐层的**扩大感受野**，描述如下：
 
 - 首先输入图片大小为$H \times W \times 3$，会先通过一个 `Patch Partition` 层，它的作用是将输入图片进行分块处理，即每相邻的像素为一个 Patch，然后再在 channel 方向上进行 flatten，维度变为$\frac{H}{4} \times \frac{W}{4} \times 48$。
-- 然后在进入 stage1 的 block 前，会先经过一个 `Linear Embedding` 层对每个像素的 channel 数据做线性变换，维度变为$\frac{H}{4} \times \frac{W}{4} \times C​$在源码中，Patch Partition 和 Linear Embedding 直接通过一个卷积层来实现，和 ViT 是一样的。值得注意这也是 stage1 不同于其它的 stage 的地方，其它 stage 的第一个模块都是 `Patch Merging` 层。
+- 然后在进入 stage1 的 block 前，会先经过一个 `Linear Embedding` 层对每个像素的 channel 数据做线性变换，维度变为$\frac{H}{4} \times \frac{W}{4} \times C$在源码中，Patch Partition 和 Linear Embedding 直接通过一个卷积层来实现，和 ViT 是一样的。值得注意这也是 stage1 不同于其它的 stage 的地方，其它 stage 的第一个模块都是 `Patch Merging` 层。
 - 利用4个 stage 构建不同大小的特征图，即通过不同的 stage 对特征图进行下采样，这里需要注意，每下采样2倍的时候，channel 需要进行一个翻倍的操作。
 - 然后在每个 stage 中都会重复堆叠 block，它的 block 有两种结构，图(b)所示，这两种结构的不同之处在于一个使用了 **W-MSA** 结构，一个使用了 **SW-MSA** 结构，并且堆叠的次数都偶数的，也就是这两种结构是成对使用的，即先使用左边的 W-MSA，然后再使用右边的 SW-MSA。
 - 最后对于分类网络，后面还会接上一个Layer Norm层、全局池化层以及全连接层得到最终输出。图中没有画，但源码中是这样做的。
@@ -84,7 +84,7 @@ patch merging：
 
 ## 代码
 
-> ## Patch Embedding
+> ### Patch Embedding
 
 ```python
 class PatchEmbed(nn.Module):
@@ -118,7 +118,7 @@ class PatchEmbed(nn.Module):
             self.norm = None
 ```
 
-> ## Patch Mergin
+> ### Patch Merging
 
 ```python
 class PatchMerging(nn.Module):
@@ -159,17 +159,9 @@ class PatchMerging(nn.Module):
         x = self.reduction(x)
 
         return x
-
-    def extra_repr(self) -> str:
-        return f"input_resolution={self.input_resolution}, dim={self.dim}"
-
-    def flops(self):
-        H, W = self.input_resolution
-        flops = H * W * self.dim
-        flops += (H // 2) * (W // 2) * 4 * self.dim * 2 * self.dim
-        return flops
-
 ```
+
+> ### SwinTransformer
 
 ```python
 class SwinTransformer(nn.Module):
