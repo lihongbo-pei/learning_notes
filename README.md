@@ -6,3 +6,8 @@
 
 ### YOLO系列
 
+## 卷积神经网络
+
+ResNet
+
+GoogLeNet
