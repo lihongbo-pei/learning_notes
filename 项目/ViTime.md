@@ -16,6 +16,10 @@
 
 为了应对这些挑战，本文提出了一种新的基于视觉智能的时间序列基础模型- -视觉时间基础模型( Visual Time Foundation Model，ViTime )，旨在从视觉智能的角度开拓时间序列基础模型研究的新范式。此外，我们还提出了一种新的时间序列数据生成方法- - Real Time Series ( RealTS )，它将时间序列分析的基础知识分为"趋势性"和"周期性"，并在ViTime的训练过程中合成训练数据。ViTime通过将数值时间序列转换为**二值图像**，将数值时间相关性转换为二进制像素空间相关性。这种方法与大脑处理时间序列数据的熟练程度相一致。实验结果表明，当应用于不同领域和分辨率的各种未知数据集时，所提出的ViTime获得了最先进的零样本结果，并且在某些情况下，超过了最佳的单独训练的监督模型。此外，仅用10 %的领域数据微调，ViTime就可以获得比使用100 %域数据的最新最先进的监督模型更优越的性能。
 
+## 相关工作
+
+- 论文回顾了传统的时间序列预测方法，如 ARIMA 和其扩展模型，以及近年来深度学习在 TSF 中的进展，包括 RNN、LSTM、GRU 和基于 Transformer 的模型。
+
 ## 方法
 
 ### 3.2 总体架构
@@ -102,3 +106,36 @@ ReMAE和ReMSE的计算公式如下所示：
 ​        在本文中，我们介绍了一种基于视觉智能的TSF基础模型ViTime，以及一种新颖的数据生成方法**RealTS**。我们的方法旨在通过利用视觉处理能力来解决传统数值数据拟合模型的固有局限性，这与人脑在处理视觉信息方面的优势更加吻合。提出的**ViTime框架将数值化的时间序列数据转化为二值图像**，使应用视觉智能技术分析和预测时间序列趋势成为可能。此外，提出的RealTS算法可以系统地生成多样化的合成时间序列数据，封装了重要的周期和趋势特征，并为ViTime模型的训练提供了足够的知识。
 
 ​       大量的实验评估表明，ViTime可以达到最先进的零样本性能。同时，微调实验表明，即使使用10 %的数据进行训练，所提出的ViTime也能优于最新的完全监督模型，证实了视觉智能在时间序列分析中的优势。我们相信，ViTime的提出可以从方法论的角度为AGI处理时间序列提供重要的见解。
+
+
+
+## 代码
+
+ViTime
+
+```python
+class ViTime(nn.Module):
+    """
+    A combined model using Masked Autoencoder (MAE) and DeepLab for image processing.
+    """
+
+    def __init__(self, args=None):
+        super().__init__()
+        MAE_Modelsize = copy.deepcopy(args.modelSize)
+        args.modelAda = True
+        self.args = args
+        self.model = ViTimeAutoencoder(args=args
+        )
+        args.modelSize = 40
+        self.RefiningModel = RefiningModel(
+  
+            downsample_factor=args.downsample_factor,
+            dropout=args.dropout, args=args
+        )
+        self.EMD = nn.Softmax(dim=-1)
+        args.modelSize = MAE_Modelsize
+        self.dataTool=Dataset_ViTime(args)
+        self.device=args.device
+```
+
+对于Refining Module，我们设置mobilenetv2作为骨干网络
