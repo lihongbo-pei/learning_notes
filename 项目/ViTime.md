@@ -2,7 +2,7 @@
 
 代码地址：https://github.com/IkeYang/ViTime
 
-前置知识：MobileNetV2、ViT、MAE
+前置知识：MobileNetV2、ViT、MAE、ASPP
 
 ## 摘要
 
@@ -77,9 +77,13 @@ Logistic增长行为( LGB )：LGB对数据进行Logistic增长函数建模，捕
 
 **Visual Time Tokenizer** 视觉时间标识符的主要作用是将被掩模的二值图像分割成多个块，整合位置编码，并将这些块映射到特征空间。该模块利用Vision Transformer( ViT ) 架构，捕捉patch之间的空间关系，从而将时间序列的时间依赖关系转化为像素值空间内的空间依赖关系。
 
-**Decoder** 解码器将令牌化的图像块转换回原始的二进制像素度量空间，并提供一个初始预测，其中ViT架构也被采用。
+**Decoder**  解码器将标记化的图像块转换回原始的二值像素度量空间，提供了一个初步预测，同时也采用了ViT架构。
 
-**Refining Module** 解码器中的Transformer结构会导致 patch 交界处的不连续性，这可能会影响逆映射过程的准确性。为了解决这个问题，使用了带有卷积神经网络的精化模块构建。最初，Decoder解码的令牌是无补丁的，并被馈送到基于CNN的主干网。然后，使用融合空洞卷积金字塔( ASPP ) 模块来扩大模型的感受野。最后，将输出结果上采样到原始的二值像素度量空间，生成最终的二值图像预测结果。
+**Refining Module** 解码器中的Transformer结构会导致 patch 连接处的不连续性，这可能会影响逆映射过程的准确性。为了解决这个问题，使用了带有卷积神经网络的精化模块构建。
+
+- 首先，Decoder解码的tokens被还原为图像块，并被馈送到基于CNN的骨干网络中（MobileNetV2）。
+- 然后，使用**融合空洞卷积金字塔( ASPP ) **模块来扩大模型的感受野。
+- 最后，将输出结果**上采样**到原始的二值像素度量空间，生成最终的二值图像预测结果。
 
 ## 实验
 
@@ -147,3 +151,55 @@ class ViTime(nn.Module):
 ```
 
 对于Refining Module，我们设置mobilenetv2作为骨干网络
+
+```python
+class RefiningModel(nn.Module):
+    def __init__(self,  downsample_factor=16, dropout=0.1, args=None):
+        super(RefiningModel, self).__init__()
+        num_classes=1
+        image_C=num_classes
+        pretrained=False
+        modelSize = args.modelSize if args else 1
+        self.DO_ASPP = getattr(args, 'aspp', True)
+        self.DO_LOWLEVEL = getattr(args, 'lowlevel', True)
+
+        AdaFactor = args.modelSize / 20 if getattr(args, 'modelAda', False) else modelSize
+        if AdaFactor <= (1 / 8):
+            AdaFactor = 1 / 8
+        dim_out = int(8 * 30 * AdaFactor)
+        low_level_channels_out = int(8 * 30 * 1 / 5 * AdaFactor)
+
+        self.backbone = MobileNetV2(AdaFactor=AdaFactor, downsample_factor=downsample_factor, pretrained=pretrained, image_C=image_C, dropout=dropout)
+        in_channels = self.backbone.in_channels
+        low_level_channels = self.backbone.low_level_channels
+
+
+        self.aspp = ASPP(dim_in=in_channels, dim_out=dim_out, rate=16 // downsample_factor)
+        self.upsampleASPP = DeconvASPP(dim_in=num_classes, dim_out=num_classes)
+
+        self.shortcut_conv = nn.Sequential(
+            nn.Conv2d(low_level_channels, low_level_channels_out, 1),
+            nn.BatchNorm2d(low_level_channels_out),
+            nn.ReLU(inplace=True)
+        )
+        if not self.DO_ASPP:
+            dim_out = in_channels
+        catin = low_level_channels_out + dim_out if self.DO_LOWLEVEL else dim_out
+        self.cat_conv = nn.Sequential(
+            nn.Conv2d(catin, dim_out, 3, padding=1),
+            nn.BatchNorm2d(dim_out),
+            nn.ReLU(inplace=True),
+            nn.Dropout(0.5),
+            nn.Conv2d(dim_out, dim_out, 3, padding=1),
+            nn.BatchNorm2d(dim_out),
+            nn.ReLU(inplace=True),
+            nn.Dropout(dropout),
+        )
+        self.cls_conv = nn.Conv2d(dim_out, num_classes, 1)
+```
+
+
+
+推理结果：
+
+![1722410101401](assets/1722410101401.png)
