@@ -10,6 +10,10 @@
 
 ## 经典论文
 
+DETR
+
+ViT
+
 ### 轻量级网络
 
 1. MobileNet系列
@@ -21,3 +25,7 @@
 ResNet
 
 GoogLeNet
+
+## 分割
+
+ASPP
